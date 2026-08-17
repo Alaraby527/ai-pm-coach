@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI PM Coach</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; background: #f6f7fb; color: #172033; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 40px auto; }
+    header { margin-bottom: 28px; }
+    h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 48px); }
+    p { color: #5e687b; line-height: 1.65; }
+    h2, h3 { margin-top: 0; }
+    .card { background: white; border: 1px solid #e5e8ef; border-radius: 18px; padding: 24px; box-shadow: 0 10px 30px #18213a0d; }
+    .card + .card { margin-top: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    label { display: grid; gap: 8px; font-weight: 700; }
+    input { border: 1px solid #cfd5e1; border-radius: 12px; padding: 12px 14px; font: inherit; }
+    input:focus { outline: 3px solid #dce7ff; border-color: #356ae6; }
+    .key-field { margin-top: 18px; }
+    textarea { min-height: 260px; resize: vertical; border: 1px solid #cfd5e1; border-radius: 12px; padding: 14px; font: inherit; line-height: 1.6; }
+    textarea:focus { outline: 3px solid #dce7ff; border-color: #356ae6; }
+    .actions { display: flex; gap: 12px; margin-top: 18px; }
+    button { border: 0; border-radius: 12px; padding: 12px 18px; font: inherit; font-weight: 750; cursor: pointer; }
+    .primary { background: #2859d6; color: white; }
+    .secondary { background: #edf1f7; color: #283247; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .note { font-size: 14px; margin: 14px 0 0; }
+    .status { min-height: 24px; margin: 14px 0 0; font-weight: 650; }
+    .status.error { color: #b42318; }
+    .score { display: inline-grid; place-items: center; width: 86px; height: 86px; border-radius: 50%; background: #e8efff; color: #1d4fce; font-size: 26px; font-weight: 800; }
+    .summary { display: flex; align-items: center; gap: 18px; }
+    .list { display: grid; gap: 12px; padding: 0; list-style: none; }
+    .item { border: 1px solid #e1e5ed; border-radius: 14px; padding: 16px; }
+    .item h3 { margin-bottom: 8px; }
+    .item p { margin: 6px 0; }
+    .badge { display: inline-block; border-radius: 999px; padding: 3px 9px; background: #f1f3f7; font-size: 12px; font-weight: 800; }
+    .badge.high { background: #fee4e2; color: #b42318; }
+    .badge.medium { background: #fff1c2; color: #7a4d00; }
+    .badge.low { background: #dcfae6; color: #067647; }
+    .interview-question { font-size: 20px; line-height: 1.6; font-weight: 750; }
+    .answer { width: 100%; min-height: 180px; }
+    .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+    .score-box { background: #f4f6fa; border-radius: 12px; padding: 14px; text-align: center; }
+    .score-box strong { display: block; font-size: 24px; color: #2859d6; }
+    [hidden] { display: none !important; }
+    @media (max-width: 720px) { .grid, .score-grid { grid-template-columns: 1fr; } main { margin: 24px auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>AI PM Coach</h1>
+      <p>用一份简历和目标 JD，找到能力差距并开始针对性练习。</p>
+    </header>
+    <section class="card" aria-labelledby="input-title">
+      <h2 id="input-title">生成成长方案</h2>
+      <div class="grid">
+        <label>简历文本<textarea id="resume" placeholder="粘贴你的简历文本"></textarea></label>
+        <label>目标岗位 JD<textarea id="job" placeholder="粘贴目标岗位描述"></textarea></label>
+      </div>
+      <label class="key-field">DeepSeek API Key（可选）
+        <input id="api-key" type="password" autocomplete="off" placeholder="云端未配置时可在这里粘贴">
+      </label>
+      <div class="actions">
+        <button class="primary" id="generate" type="button">生成成长方案</button>
+        <button class="secondary" id="clear" type="button">清空</button>
+      </div>
+      <p class="note">留空时使用站点的云端配置；自行填写的 Key 只随请求发送，不写入 localStorage、文件或日志。</p>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="results" aria-labelledby="result-title" hidden>
+      <h2 id="result-title">成长方案</h2>
+      <div class="summary">
+        <div class="score" id="score"></div>
+        <p id="verdict"></p>
+      </div>
+      <h3>能力差距</h3>
+      <div class="list" id="gaps"></div>
+      <h3>7 天行动计划</h3>
+      <div class="list" id="plan"></div>
+      <div class="actions"><button class="primary" id="start-interview" type="button">开始模拟面试</button></div>
+    </section>
+    <section class="card" id="interview" aria-labelledby="interview-title" hidden>
+      <h2 id="interview-title">模拟面试</h2>
+      <p class="note" id="question-meta"></p>
+      <p class="interview-question" id="question"></p>
+      <label>你的回答<textarea class="answer" id="answer" placeholder="建议先给结论，再说明判断依据、方案和指标"></textarea></label>
+      <div class="actions">
+        <button class="primary" id="submit-answer" type="button">提交回答</button>
+        <button class="secondary" id="next-question" type="button" hidden>下一题</button>
+      </div>
+      <p class="status" id="interview-status" role="status" aria-live="polite"></p>
+      <div id="feedback" hidden>
+        <div class="score-grid" id="score-grid"></div>
+        <h3>总体评价</h3><p id="overall"></p>
+        <h3>遗漏点</h3><ul id="omissions"></ul>
+        <h3>改进建议</h3><ul id="suggestions"></ul>
+        <h3>参考回答</h3><p id="sample-answer"></p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const storageKey = "ai-pm-coach-state-v1";
+    const resumeInput = document.querySelector("#resume");
+    const jobInput = document.querySelector("#job");
+    const apiKeyInput = document.querySelector("#api-key");
+    const generateButton = document.querySelector("#generate");
+    const status = document.querySelector("#status");
+    const results = document.querySelector("#results");
+    const interviewSection = document.querySelector("#interview");
+    const interviewStatus = document.querySelector("#interview-status");
+    let appState = loadState();
+
+    document.querySelector("#clear").addEventListener("click", () => {
+      localStorage.removeItem(storageKey);
+      appState = null;
+      resumeInput.value = "";
+      jobInput.value = "";
+      apiKeyInput.value = "";
+      results.hidden = true;
+      interviewSection.hidden = true;
+      setStatus("已清空本地数据");
+    });
+
+    generateButton.addEventListener("click", async () => {
+      const resume = resumeInput.value.trim();
+      const jobDescription = jobInput.value.trim();
+      if (!resume || !jobDescription) return setStatus("请先填写简历和岗位 JD", true);
+      setLoading(generateButton, true, "正在分析…");
+      setStatus("正在根据 JD 对照简历，请稍候");
+      try {
+        const plan = await postJson("/api/plan", { resume, jobDescription });
+        appState = { resume, jobDescription, plan, interview: [], currentQuestion: null };
+        saveState();
+        renderPlan(plan);
+        setStatus("成长方案已生成并保存在本机浏览器");
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        setLoading(generateButton, false, "生成成长方案");
+      }
+    });
+
+    function renderPlan(data) {
+      document.querySelector("#score").textContent = `${data.summary.matchScore}%`;
+      document.querySelector("#verdict").textContent = data.summary.verdict;
+      const gaps = document.querySelector("#gaps");
+      gaps.replaceChildren(...data.gaps.map((gap) => {
+        const item = el("article", "item");
+        const heading = el("h3", "", gap.requirement + " ");
+        heading.append(el("span", `badge ${gap.priority}`, priorityLabel(gap.priority)));
+        item.append(
+          heading,
+          el("p", "", `简历证据：${gap.resumeEvidence}`),
+          el("p", "", `差距：${gap.gap}`),
+          el("p", "", `下一步：${gap.nextAction}`)
+        );
+        return item;
+      }));
+
+      const plan = document.querySelector("#plan");
+      plan.replaceChildren(...data.sevenDayPlan.map((day) => {
+        const item = el("article", "item");
+        item.append(
+          el("h3", "", `第 ${day.day} 天 · ${day.goal}`),
+          el("p", "", `任务：${day.task}`),
+          el("p", "", `交付物：${day.deliverable}`),
+          el("p", "", `自测：${day.selfCheck}`)
+        );
+        return item;
+      }));
+      results.hidden = false;
+      results.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    document.querySelector("#start-interview").addEventListener("click", getNextQuestion);
+    document.querySelector("#next-question").addEventListener("click", getNextQuestion);
+    document.querySelector("#submit-answer").addEventListener("click", scoreAnswer);
+
+    async function getNextQuestion() {
+      if (!appState?.plan) return setStatus("请先生成成长方案", true);
+      const startButton = document.querySelector("#start-interview");
+      const nextButton = document.querySelector("#next-question");
+      setLoading(startButton, true, "正在出题…");
+      setLoading(nextButton, true, "正在出题…");
+      setInterviewStatus("正在生成针对当前差距的面试题");
+      try {
+        const currentQuestion = await postJson("/api/interview/question", {
+          jobDescription: appState.jobDescription,
+          gaps: appState.plan.gaps,
+          previousQuestions: appState.interview.map((item) => item.question.question)
+        });
+        appState.currentQuestion = currentQuestion;
+        saveState();
+        renderQuestion(currentQuestion);
+        setInterviewStatus("请作答；不知道也可以写出你的分析思路");
+      } catch (error) {
+        setInterviewStatus(error.message, true);
+      } finally {
+        setLoading(startButton, false, "开始模拟面试");
+        setLoading(nextButton, false, "下一题");
+      }
+    }
+
+    async function scoreAnswer() {
+      const answer = document.querySelector("#answer").value.trim();
+      if (!appState?.currentQuestion) return setInterviewStatus("请先生成一道面试题", true);
+      if (!answer) return setInterviewStatus("请先填写你的回答", true);
+      const button = document.querySelector("#submit-answer");
+      setLoading(button, true, "正在评分…");
+      setInterviewStatus("正在按四项量表分析回答");
+      try {
+        const feedback = await postJson("/api/interview/score", {
+          jobDescription: appState.jobDescription,
+          question: appState.currentQuestion.question,
+          answer
+        });
+        appState.interview.push({ question: appState.currentQuestion, answer, feedback });
+        saveState();
+        renderFeedback(feedback);
+        document.querySelector("#next-question").hidden = false;
+        setInterviewStatus("评分已完成并保存在本机浏览器");
+      } catch (error) {
+        setInterviewStatus(error.message, true);
+      } finally {
+        setLoading(button, false, "提交回答");
+      }
+    }
+
+    function renderQuestion(data) {
+      interviewSection.hidden = false;
+      document.querySelector("#question-meta").textContent = `题型：${typeLabel(data.type)} · 考察点：${data.focus}`;
+      document.querySelector("#question").textContent = data.question;
+      document.querySelector("#answer").value = "";
+      document.querySelector("#feedback").hidden = true;
+      document.querySelector("#next-question").hidden = true;
+      interviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderFeedback(data) {
+      const labels = {
+        productStructure: "产品结构",
+        aiTechnicalJudgment: "AI 技术判断",
+        metricsAwareness: "指标意识",
+        communication: "表达清晰度"
+      };
+      document.querySelector("#score-grid").replaceChildren(...Object.entries(labels).map(([key, label]) => {
+        const box = el("div", "score-box", label);
+        box.prepend(el("strong", "", `${data.scores[key]}/5`));
+        return box;
+      }));
+      document.querySelector("#overall").textContent = data.overall;
+      fillList("#omissions", data.omissions.length ? data.omissions : ["未发现明显遗漏"]);
+      fillList("#suggestions", data.suggestions);
+      document.querySelector("#sample-answer").textContent = data.sampleAnswer;
+      document.querySelector("#feedback").hidden = false;
+    }
+
+    async function postJson(url, body) {
+      let response;
+      try {
+        const apiKey = apiKeyInput.value.trim();
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(apiKey ? { "x-ai-api-key": apiKey } : {})
+          },
+          body: JSON.stringify(body)
+        });
+      } catch {
+        throw new Error("无法连接服务，请检查网络后重试");
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "请求失败，请重试");
+      return data;
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.classList.toggle("error", isError);
+    }
+
+    function setInterviewStatus(message, isError = false) {
+      interviewStatus.textContent = message;
+      interviewStatus.classList.toggle("error", isError);
+    }
+
+    function setLoading(button, loading, text) {
+      button.disabled = loading;
+      button.textContent = text;
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function priorityLabel(priority) {
+      return ({ high: "高优先级", medium: "中优先级", low: "低优先级" })[priority] || priority;
+    }
+
+    function typeLabel(type) {
+      return ({ product: "产品设计", technical: "AI 技术", metrics: "指标评估", project: "项目深挖" })[type] || type;
+    }
+
+    function fillList(selector, values) {
+      document.querySelector(selector).replaceChildren(...values.map((value) => el("li", "", value)));
+    }
+
+    function loadState() {
+      try { return JSON.parse(localStorage.getItem(storageKey)); }
+      catch { localStorage.removeItem(storageKey); return null; }
+    }
+
+    function saveState() {
+      localStorage.setItem(storageKey, JSON.stringify(appState));
+    }
+
+    if (appState) {
+      if (appState.resume && appState.jobDescription) {
+        resumeInput.value = appState.resume;
+        jobInput.value = appState.jobDescription;
+      }
+      if (appState.plan) renderPlan(appState.plan);
+      if (appState.currentQuestion) {
+        renderQuestion(appState.currentQuestion);
+        const latest = appState.interview?.at(-1);
+        if (latest?.question?.question === appState.currentQuestion.question) {
+          document.querySelector("#answer").value = latest.answer;
+          renderFeedback(latest.feedback);
+          document.querySelector("#next-question").hidden = false;
+        }
+      }
+    }
+    if (location.protocol === "file:") {
+      setStatus("当前是直接打开的 HTML 文件，后端接口不可用。请运行 start-windows.cmd", true);
+    }
+  </script>
+</body>
+</html>
+

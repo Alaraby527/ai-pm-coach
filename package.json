@@ -1,0 +1,10 @@
+{
+  "name": "ai-pm-coach",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --use-env-proxy server.js",
+    "test": "node --test"
+  }
+}
+
