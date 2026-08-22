@@ -1,10 +1,27 @@
 # AI PM Coach — AI 产品经理求职教练
 
+![Node.js](https://img.shields.io/badge/Node.js-24+-green)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Vercel](https://img.shields.io/badge/Deploy-Vercel-black)
+![LLM](https://img.shields.io/badge/LLM-Multi--model-blue)
+
 面向 AI 产品经理求职者的轻量教练。粘贴简历和目标岗位 JD 后，生成有证据约束的能力差距、7 天行动计划，并提供针对性模拟面试与四维评分。
 
-[在线体验](https://ai-pm-coach-omega.vercel.app/)
+**[在线体验 →](https://ai-pm-coach-omega.vercel.app/)**
 
 ![AI PM Coach 产品界面](./preview.png)
+
+## 目录
+
+- [业务背景](#业务背景)
+- [用户场景](#用户场景)
+- [人机方案](#人机方案)
+- [产品设计](#产品设计)
+- [技术架构](#技术架构)
+- [评测](#评测)
+- [本地运行](#本地运行)
+- [项目结构](#项目结构)
+- [项目边界](#项目边界)
 
 ## 业务背景
 
@@ -60,12 +77,10 @@ AI 产品经理岗位的求职建议普遍存在两个问题：通用建议很�
 
 ## 技术架构
 
-```
-浏览器（public/index.html）
-    ↓ HTTP 请求
-本地 Node 服务（server.js）
-    ↓ OpenAI 兼容接口 + JSON Output
-大模型（DeepSeek / 通义千问 / Kimi / 智谱，可切换）
+```mermaid
+flowchart LR
+    A[浏览器<br/>public/index.html] -->|HTTP 请求| B[Node 服务<br/>server.js]
+    B -->|OpenAI 兼容接口<br/>JSON Output| C[大模型<br/>DeepSeek / 通义 / Kimi / 智谱]
 ```
 
 ### 技术选型
