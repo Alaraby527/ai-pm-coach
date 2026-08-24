@@ -122,28 +122,9 @@ npm test
 
 项目可直接部署到 Vercel。将 `AI_API_KEY` 配置为 Vercel 环境变量；可选配置 `AI_API_BASE_URL` 和 `AI_MODEL`。API Key 不应写入仓库。
 
-## 本地运行
+## 在线体验
 
-要求 Node.js 24 或更新版本，不需要安装第三方依赖。
-
-### Windows 一键启动
-
-双击 `start-windows.cmd`，按提示输入 DeepSeek API Key；脚本会自动打开本地网页。保持启动窗口开启；按回车停止服务。
-
-不要直接双击 `public/index.html`，否则网页连接不到后端。
-
-### 命令行启动
-
-```powershell
-$env:AI_API_KEY="你的 DeepSeek API Key"
-npm start
-```
-
-浏览器打开 http://127.0.0.1:3000 。端口被占用时：
-
-```powershell
-npm start -- 43127
-```
+直接访问 [AI PM Coach](https://ai-pm-coach-omega.vercel.app/)。仓库中的 Node 服务和测试文件用于实现审阅与回归验证，不作为作品集访问入口。
 
 ## 项目结构
 
