@@ -134,7 +134,6 @@ npm test
 ├── server.js              # Node 本地服务 + API 代理
 ├── server.test.js         # 自检
 ├── vercel.json            # Vercel 部署配置
-├── start-windows.cmd      # Windows 一键启动
 ├── api/[...path].js       # Vercel Serverless 入口
 ├── public/index.html      # 前端单文件
 └── preview.png            # 产品截图
