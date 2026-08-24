@@ -99,7 +99,7 @@ export function createHandler({ model = callCompatibleModel } = {}) {
     try {
       const route = request.query?.path
         ? `/api/${[].concat(request.query.path).join("/")}`
-        : new URL(request.url, "http://localhost").pathname;
+        : new URL(request.url, "https://base.invalid").pathname;
 
       if (request.method === "GET" && route === "/api/health") {
         return sendJson(response, 200, { ok: true });
@@ -346,7 +346,7 @@ function sendJson(response, status, value) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.argv[2] || process.env.PORT || 3000);
   createServer().listen(port, "127.0.0.1", () => {
-    console.log(`AI PM Coach: http://127.0.0.1:${port}`);
+    console.log(`AI PM Coach server listening on port ${port}`);
   });
 }
 
