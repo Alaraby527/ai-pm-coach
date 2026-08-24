@@ -280,19 +280,37 @@ function requiredText(value, label) {
 }
 
 function isPlan(value) {
+  const gaps = value?.gaps;
+  const days = value?.sevenDayPlan;
+  const strings = ["requirement", "resumeEvidence", "gap", "nextAction"];
   return Boolean(
     value &&
     Number.isInteger(value.summary?.matchScore) &&
-    typeof value.summary?.verdict === "string" &&
-    Array.isArray(value.gaps) &&
-    value.gaps.length > 0 &&
-    Array.isArray(value.sevenDayPlan) &&
-    value.sevenDayPlan.length === 7
+    value.summary.matchScore >= 0 &&
+    value.summary.matchScore <= 100 &&
+    typeof value.summary.verdict === "string" &&
+    Array.isArray(gaps) &&
+    gaps.length >= 1 &&
+    gaps.length <= 6 &&
+    gaps.every((gap) => strings.every((key) => typeof gap?.[key] === "string") && ["high", "medium", "low"].includes(gap.priority)) &&
+    Array.isArray(days) &&
+    days.length === 7 &&
+    days.every((day) =>
+      Number.isInteger(day?.day) &&
+      day.day >= 1 &&
+      day.day <= 7 &&
+      ["goal", "task", "deliverable", "selfCheck"].every((key) => typeof day?.[key] === "string")
+    )
   );
 }
 
 function isQuestion(value) {
-  return Boolean(value && typeof value.question === "string" && typeof value.focus === "string");
+  return Boolean(
+    value &&
+    typeof value.question === "string" &&
+    typeof value.focus === "string" &&
+    ["product", "technical", "metrics", "project"].includes(value.type)
+  );
 }
 
 function isScore(value) {
@@ -302,7 +320,13 @@ function isScore(value) {
     [scores.productStructure, scores.aiTechnicalJudgment, scores.metricsAwareness, scores.communication]
       .every((score) => Number.isInteger(score) && score >= 1 && score <= 5) &&
     typeof value.overall === "string" &&
+    Array.isArray(value.omissions) &&
+    value.omissions.length <= 5 &&
+    value.omissions.every((item) => typeof item === "string") &&
     Array.isArray(value.suggestions) &&
+    value.suggestions.length >= 1 &&
+    value.suggestions.length <= 5 &&
+    value.suggestions.every((item) => typeof item === "string") &&
     typeof value.sampleAnswer === "string"
   );
 }
