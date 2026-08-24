@@ -103,3 +103,23 @@ test("模拟面试完成出题到四维评分闭环", async (context) => {
   assert.deepEqual(await scoreResponse.json(), sampleScore);
 });
 
+
+
+test("面试题接口拒绝不符合枚举的题型", async (context) => {
+  const server = createServer({ model: async () => ({ ...sampleQuestion, type: "unknown" }) });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  context.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/interview/question`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jobDescription: "要求理解 RAG",
+      gaps: samplePlan.gaps,
+      previousQuestions: []
+    })
+  });
+
+  assert.equal(response.status, 502);
+});
