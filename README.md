@@ -1,4 +1,4 @@
-# AI PM Coach — AI 产品经理求职教练
+# AI PM Coach — AI 产品经理求职教练（MVP，未做量化评测）
 
 ![Node.js](https://img.shields.io/badge/Node.js-24+-green)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -6,6 +6,8 @@
 ![LLM](https://img.shields.io/badge/LLM-Multi--model-blue)
 
 面向 AI 产品经理求职者的轻量教练。粘贴简历和目标岗位 JD 后，生成有证据约束的能力差距、7 天行动计划，并提供针对性模拟面试与四维评分。
+
+> 状态说明：这是一个验证核心建议是否有用的 MVP，尚未进行真实用户测试，没有核心流程完成率、建议采纳率等量化数据（见下方"当前局限"）。在补齐评测数据前，请把它当作交互原型而非已验证的产品。
 
 **[在线体验 →](https://ai-pm-coach-omega.vercel.app/)**
 
