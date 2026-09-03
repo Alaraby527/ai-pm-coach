@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI PM Coach</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; background: #f6f7fb; color: #172033; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 40px auto; }
+    header { margin-bottom: 28px; }
+    h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 48px); }
+    p { color: #5e687b; line-height: 1.65; }
+    h2, h3 { margin-top: 0; }
+    .card { background: white; border: 1px solid #e5e8ef; border-radius: 18px; padding: 24px; box-shadow: 0 10px 30px #18213a0d; }
+    .card + .card { margin-top: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    label { display: grid; gap: 8px; font-weight: 700; }
+    input { border: 1px solid #cfd5e1; border-radius: 12px; padding: 12px 14px; font: inherit; }
+    input:focus { outline: 3px solid #dce7ff; border-color: #356ae6; }
+    .key-field { margin-top: 18px; }
+    textarea { min-height: 260px; resize: vertical; border: 1px solid #cfd5e1; border-radius: 12px; padding: 14px; font: inherit; line-height: 1.6; }
+    textarea:focus { outline: 3px solid #dce7ff; border-color: #356ae6; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+    button { border: 0; border-radius: 12px; padding: 12px 18px; font: inherit; font-weight: 750; cursor: pointer; }
+    .primary { background: #2859d6; color: white; }
+    .secondary { background: #edf1f7; color: #283247; }
+    .ghost { background: #fff7e6; color: #7a4d00; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .note { font-size: 14px; margin: 14px 0 0; }
+    .status { min-height: 24px; margin: 14px 0 0; font-weight: 650; }
+    .status.error { color: #b42318; }
+    .demo-tag { display:inline-block; margin-left:8px; font-size:12px; font-weight:800; color:#7a4d00; background:#fff1c2; border-radius:999px; padding:2px 10px; vertical-align:middle; }
+    .score { display: inline-grid; place-items: center; width: 86px; height: 86px; border-radius: 50%; background: #e8efff; color: #1d4fce; font-size: 26px; font-weight: 800; }
+    .summary { display: flex; align-items: center; gap: 18px; }
+    .list { display: grid; gap: 12px; padding: 0; list-style: none; }
+    .item { border: 1px solid #e1e5ed; border-radius: 14px; padding: 16px; }
+    .item h3 { margin-bottom: 8px; }
+    .item p { margin: 6px 0; }
+    .badge { display: inline-block; border-radius: 999px; padding: 3px 9px; background: #f1f3f7; font-size: 12px; font-weight: 800; }
+    .badge.high { background: #fee4e2; color: #b42318; }
+    .badge.medium { background: #fff1c2; color: #7a4d00; }
+    .badge.low { background: #dcfae6; color: #067647; }
+    .interview-question { font-size: 20px; line-height: 1.6; font-weight: 750; }
+    .answer { width: 100%; min-height: 180px; }
+    .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+    .score-box { background: #f4f6fa; border-radius: 12px; padding: 14px; text-align: center; }
+    .score-box strong { display: block; font-size: 24px; color: #2859d6; }
+    [hidden] { display: none !important; }
+    @media (max-width: 720px) { .grid, .score-grid { grid-template-columns: 1fr; } main { margin: 24px auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>AI PM Coach</h1>
+      <p>用一份简历和目标 JD，找到能力差距并开始针对性练习。</p>
+    </header>
+    <section class="card" aria-labelledby="input-title">
+      <h2 id="input-title">生成成长方案</h2>
+      <div class="grid">
+        <label>简历文本<textarea id="resume" placeholder="粘贴你的简历文本"></textarea></label>
+        <label>目标岗位 JD<textarea id="job" placeholder="粘贴目标岗位描述"></textarea></label>
+      </div>
+      <label class="key-field">DeepSeek API Key（静态演示版需要）
+        <input id="api-key" type="password" autocomplete="off" placeholder="粘贴你的 DeepSeek Key 后可真实生成；不填也能看演示">
+      </label>
+      <div class="actions">
+        <button class="primary" id="generate" type="button">生成成长方案</button>
+        <button class="ghost" id="demo-run" type="button">免 Key 看演示</button>
+        <button class="secondary" id="fill-demo" type="button">填入示例简历 / JD</button>
+        <button class="secondary" id="clear" type="button">清空</button>
+      </div>
+      <p class="note" id="key-note">本页面为静态演示版：填写你自己的 DeepSeek API Key 后会从浏览器直连 DeepSeek 真实生成，Key 只在你的浏览器与 DeepSeek 之间传输，不经过任何中间服务器、也不写入本地；不想填 Key 可点「免 Key 看演示」浏览一份示例输出。</p>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="results" aria-labelledby="result-title" hidden>
+      <h2 id="result-title">成长方案<span class="demo-tag" id="plan-demo-tag" hidden>演示样例</span></h2>
+      <div class="summary">
+        <div class="score" id="score"></div>
+        <p id="verdict"></p>
+      </div>
+      <h3>能力差距</h3>
+      <div class="list" id="gaps"></div>
+      <h3>7 天行动计划</h3>
+      <div class="list" id="plan"></div>
+      <div class="actions"><button class="primary" id="start-interview" type="button">开始模拟面试</button></div>
+    </section>
+    <section class="card" id="interview" aria-labelledby="interview-title" hidden>
+      <h2 id="interview-title">模拟面试<span class="demo-tag" id="interview-demo-tag" hidden>演示样例</span></h2>
+      <p class="note" id="question-meta"></p>
+      <p class="interview-question" id="question"></p>
+      <label>你的回答<textarea class="answer" id="answer" placeholder="建议先给结论，再说明判断依据、方案和指标（演示模式下可任意填写）"></textarea></label>
+      <div class="actions">
+        <button class="primary" id="submit-answer" type="button">提交回答</button>
+        <button class="secondary" id="next-question" type="button" hidden>下一题</button>
+      </div>
+      <p class="status" id="interview-status" role="status" aria-live="polite"></p>
+      <div id="feedback" hidden>
+        <div class="score-grid" id="score-grid"></div>
+        <h3>总体评价</h3><p id="overall"></p>
+        <h3>遗漏点</h3><ul id="omissions"></ul>
+        <h3>改进建议</h3><ul id="suggestions"></ul>
+        <h3>参考回答</h3><p id="sample-answer"></p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const storageKey = "ai-pm-coach-state-v1";
+    const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
+    const DEEPSEEK_MODEL = "deepseek-chat";
+    const NO_KEY_HINT = "静态演示版需要你自己的 DeepSeek API Key 才能真实生成（在上方粘贴即可，Key 不会被保存）；不想填可以点「免 Key 看演示」。";
+
+    // —— 与后端一致的输出结构约束与系统提示（静态环境下用于浏览器直连）——
+    const SCHEMAS = {
+      plan: {
+        type: "object", additionalProperties: false,
+        required: ["summary", "gaps", "sevenDayPlan"],
+        properties: {
+          summary: { type: "object", additionalProperties: false, required: ["matchScore", "verdict"],
+            properties: { matchScore: { type: "integer", minimum: 0, maximum: 100 }, verdict: { type: "string" } } },
+          gaps: { type: "array", minItems: 1, maxItems: 6, items: { type: "object", additionalProperties: false,
+            required: ["requirement", "resumeEvidence", "gap", "priority", "nextAction"],
+            properties: {
+              requirement: { type: "string" }, resumeEvidence: { type: "string" }, gap: { type: "string" },
+              priority: { type: "string", enum: ["high", "medium", "low"] }, nextAction: { type: "string" } } } },
+          sevenDayPlan: { type: "array", minItems: 7, maxItems: 7, items: { type: "object", additionalProperties: false,
+            required: ["day", "goal", "task", "deliverable", "selfCheck"],
+            properties: { day: { type: "integer", minimum: 1, maximum: 7 }, goal: { type: "string" }, task: { type: "string" }, deliverable: { type: "string" }, selfCheck: { type: "string" } } } }
+        }
+      },
+      question: {
+        type: "object", additionalProperties: false, required: ["question", "focus", "type"],
+        properties: { question: { type: "string" }, focus: { type: "string" }, type: { type: "string", enum: ["product", "technical", "metrics", "project"] } }
+      },
+      score: {
+        type: "object", additionalProperties: false, required: ["scores", "overall", "omissions", "suggestions", "sampleAnswer"],
+        properties: {
+          scores: { type: "object", additionalProperties: false,
+            required: ["productStructure", "aiTechnicalJudgment", "metricsAwareness", "communication"],
+            properties: {
+              productStructure: { type: "integer", minimum: 1, maximum: 5 },
+              aiTechnicalJudgment: { type: "integer", minimum: 1, maximum: 5 },
+              metricsAwareness: { type: "integer", minimum: 1, maximum: 5 },
+              communication: { type: "integer", minimum: 1, maximum: 5 } } },
+          overall: { type: "string" },
+          omissions: { type: "array", maxItems: 5, items: { type: "string" } },
+          suggestions: { type: "array", minItems: 1, maxItems: 5, items: { type: "string" } },
+          sampleAnswer: { type: "string" }
+        }
+      }
+    };
+    const INSTRUCTIONS = {
+      plan: [
+        "你是严谨的 AI 产品经理求职教练，使用简体中文回答。",
+        "只根据用户提供的简历和 JD 判断；不得编造经历、技能或数字。",
+        "每个已具备能力都要在 resumeEvidence 中引用或概括简历证据，没有证据就明确写未发现相关证据。",
+        "gap 必须对应 JD 要求。nextAction 和七天任务要在学生可执行范围内，并产出可检查的成果。",
+        "matchScore 是基于当前文本的启发式匹配度，不是招聘通过率。"
+      ].join("\n"),
+      question: [
+        "你是 AI 产品经理面试官，使用简体中文。",
+        "基于目标 JD 和能力差距只生成一道具体、可作答的问题。",
+        "优先考察高优先级差距；避开 previousQuestions 中已经问过的内容。",
+        "问题应检验产品判断，而不是要求背诵定义。"
+      ].join("\n"),
+      score: [
+        "你是严格但具体的 AI 产品经理面试官，使用简体中文。",
+        "分别按产品结构、AI 技术判断、指标意识、表达清晰度打 1 到 5 分。",
+        "评分必须基于用户回答，不因语言华丽抬高分数。",
+        "建议要可执行；参考回答不得虚构用户经历或业务数据，缺少时用【待补充】标明。"
+      ].join("\n")
+    };
+
+    const DEMO = {
+      resume: [
+        "杨同学，某 211 信息管理专业本科，求职方向：AI 产品经理实习生。",
+        "实习：在某 AI 创业公司做过 3 个月内容运营，参与过一次智能客服知识库的整理，标注过 500+ 条问答。",
+        "项目：用 Dify 搭过一个简历优化助手，能根据 JD 提取关键词并给出修改建议；会写基础 Prompt，了解 RAG 的基本流程。",
+        "技能：Axure、Figma、SQL 基础查询；了解大模型基本概念，看过 Attention 的科普。"
+      ].join("\n"),
+      jd: [
+        "AI 产品经理实习生（某大厂）",
+        "1. 负责大模型应用的需求分析与方案设计，输出 PRD 与评测方案；",
+        "2. 设计 Prompt 与 RAG 流程，能定义效果指标并通过 Bad Case 迭代；",
+        "3. 与算法、工程协作推进落地，用数据判断方案好坏；",
+        "4. 有 Agent / 多轮对话 / 工具调用经验者优先。"
+      ].join("\n"),
+      plan: {
+        summary: { matchScore: 62, verdict: "方向匹配、有真实动手痕迹，但缺少『可量化的效果指标—评测—迭代』闭环，以及 Agent / 工具调用的系统经验，属于可通过针对性练习在 1-2 周内补齐主要短板的水平。" },
+        gaps: [
+          { requirement: "定义效果指标并评测大模型应用", resumeEvidence: "简历提到用 Dify 搭简历优化助手、标注 500+ 条问答，但没有写用什么指标衡量好坏、提升了多少。", gap: "缺少评测集、评分维度与前后对比数据，无法证明你能判断模型效果。", priority: "high", nextAction: "给简历助手补一个 30 条样本的小评测集，定义命中率/可用率，跑一版基线并记录 Bad Case 分类。" },
+          { requirement: "设计 Prompt 与 RAG 流程", resumeEvidence: "会写基础 Prompt、了解 RAG 基本流程、整理过客服知识库。", gap: "停留在『跑通过』，没有体现切片策略、召回失败处理、引用溯源等设计判断。", priority: "medium", nextAction: "把现有 RAG 拆成检索/生成两段，各列 2 个失败模式和对应改法，画一张流程图。" },
+          { requirement: "Agent / 工具调用经验", resumeEvidence: "未发现相关证据。", priority: "high", resumeEvidence: "简历中没有多步规划、工具调用或多 Agent 的项目。", gap: "JD 的优先项完全空白，是最大的硬缺口。", nextAction: "用一个能调 2 个工具（搜索+计算器）的小 Agent 复现一个真实任务，记录规划链路与失败点。" },
+          { requirement: "与算法/工程协作推进落地", resumeEvidence: "实习中参与智能客服知识库整理。", gap: "只写了执行动作，没有体现你推动了什么决策或协作结果。", priority: "low", nextAction: "用 STAR 重写这段，补你提出的建议、对方如何采纳、最终变化。" }
+        ],
+        sevenDayPlan: [
+          { day: 1, goal: "建立评测意识", task: "选简历助手，定义 3 个可量化指标并标注 30 条评测样本", deliverable: "一份评测集 + 指标定义表", selfCheck: "每条样本都能被第三方按同一标准打分" },
+          { day: 2, goal: "跑出基线", task: "用当前版本跑评测集，统计各指标并按错误类型归档", deliverable: "基线得分 + Bad Case 分类表", selfCheck: "每类错误至少有 3 个例子" },
+          { day: 3, goal: "补 RAG 设计", task: "画检索-生成流程图，为每段列失败模式与对策", deliverable: "RAG 流程图 + 失败模式清单", selfCheck: "能说清召回为空、召回错误、幻觉分别怎么处理" },
+          { day: 4, goal: "迭代并对比", task: "按 Top2 错误改 Prompt/切片，重跑评测并与基线对比", deliverable: "迭代前后对比表", selfCheck: "至少一个指标有明确数字提升且能解释原因" },
+          { day: 5, goal: "补齐 Agent", task: "搭一个调用搜索+计算器的小 Agent 完成一个真实任务", deliverable: "可运行 Demo + 规划链路记录", selfCheck: "能指出一次工具调用失败及你的修正" },
+          { day: 6, goal: "沉淀作品集", task: "把评测-迭代闭环和 Agent Demo 整理成一页项目说明", deliverable: "一页项目 Case（问题/方案/指标/反思）", selfCheck: "没有数据空话，每个结论都有证据" },
+          { day: 7, goal: "面试预演", task: "针对最高优先级差距，准备 2 个项目深挖问答并自测", deliverable: "口述版项目故事 + 可能追问清单", selfCheck: "能在 2 分钟内讲清『指标-改动-结果』" }
+        ]
+      },
+      question: { type: "product", focus: "效果评测与指标定义", question: "你说用 Dify 搭过简历优化助手——如果让你判断这个助手『好不好用』，你会定义哪些指标、怎么收集样本、迭代后又怎么证明它确实变好了？" },
+      score: {
+        scores: { productStructure: 3, aiTechnicalJudgment: 2, metricsAwareness: 2, communication: 4 },
+        overall: "回答有结论、表达清楚，但评测只停留在『身边同学觉得有用』这类主观反馈，缺少可复算的指标和对照，AI 技术判断上也没区分检索质量和生成质量，属于有意识但方法不完整。",
+        omissions: ["没有给出评测集如何抽样、样本量多少", "没有区分检索阶段与生成阶段的指标", "没有迭代前后的同口径对比", "没提到引用溯源、幻觉率这类 RAG 特有风险点"],
+        suggestions: ["先给一套指标：召回命中率、建议采纳率、事实一致率，并写清口径", "用固定评测集做前后对比，避免换一批样本导致结论不可比", "把『同学反馈』转成可统计的行为数据或评分表"],
+        sampleAnswer: "结论先行：我会把『好用』拆成离线指标和在线使用两层。离线先冻结 30 条覆盖不同岗位的样本，检索看 Top3 命中率，生成看建议可用率和事实一致率，两人背靠背打分取一致率；跑出版本 A 基线后，针对最高频的错误类型改切片和 Prompt，再用同一批评测集跑版本 B，只有同口径数字提升且能归因到具体改动才算变好了。在线则看采纳率和二次编辑率。这样指标可复算、前后可对比，也能向工程同学讲清要改哪里。"
+      }
+    };
+
+    const resumeInput = document.querySelector("#resume");
+    const jobInput = document.querySelector("#job");
+    const apiKeyInput = document.querySelector("#api-key");
+    const generateButton = document.querySelector("#generate");
+    const status = document.querySelector("#status");
+    const results = document.querySelector("#results");
+    const interviewSection = document.querySelector("#interview");
+    const interviewStatus = document.querySelector("#interview-status");
+    let appState = loadState();
+
+    document.querySelector("#clear").addEventListener("click", () => {
+      localStorage.removeItem(storageKey);
+      appState = null;
+      resumeInput.value = "";
+      jobInput.value = "";
+      apiKeyInput.value = "";
+      results.hidden = true;
+      interviewSection.hidden = true;
+      setStatus("已清空本地数据");
+    });
+
+    document.querySelector("#fill-demo").addEventListener("click", () => {
+      resumeInput.value = DEMO.resume;
+      jobInput.value = DEMO.jd;
+      setStatus("已填入示例简历 / JD，可直接点「生成成长方案」（需 Key）或「免 Key 看演示」");
+    });
+
+    document.querySelector("#demo-run").addEventListener("click", () => {
+      resumeInput.value = DEMO.resume;
+      jobInput.value = DEMO.jd;
+      appState = { resume: DEMO.resume, jobDescription: DEMO.jd, plan: DEMO.plan, interview: [], currentQuestion: null, demo: true };
+      saveState();
+      renderPlan(DEMO.plan, true);
+      setStatus("这是一份内置演示样例，用于展示输出结构；填写自己的 Key 后会按你的真实简历/JD 生成。");
+    });
+
+    generateButton.addEventListener("click", async () => {
+      const resume = resumeInput.value.trim();
+      const jobDescription = jobInput.value.trim();
+      if (!resume || !jobDescription) return setStatus("请先填写简历和岗位 JD", true);
+      setLoading(generateButton, true, "正在分析…");
+      setStatus("正在根据 JD 对照简历，请稍候");
+      try {
+        const plan = await postJson("/api/plan", { resume, jobDescription }, "plan");
+        appState = { resume, jobDescription: jobDescription, plan, interview: [], currentQuestion: null, demo: false };
+        saveState();
+        renderPlan(plan, false);
+        setStatus("成长方案已生成并保存在本机浏览器");
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        setLoading(generateButton, false, "生成成长方案");
+      }
+    });
+
+    function renderPlan(data, isDemo) {
+      document.querySelector("#plan-demo-tag").hidden = !isDemo;
+      document.querySelector("#score").textContent = `${data.summary.matchScore}%`;
+      document.querySelector("#verdict").textContent = data.summary.verdict;
+      const gaps = document.querySelector("#gaps");
+      gaps.replaceChildren(...data.gaps.map((gap) => {
+        const item = el("article", "item");
+        const heading = el("h3", "", gap.requirement + " ");
+        heading.append(el("span", `badge ${gap.priority}`, priorityLabel(gap.priority)));
+        item.append(
+          heading,
+          el("p", "", `简历证据：${gap.resumeEvidence}`),
+          el("p", "", `差距：${gap.gap}`),
+          el("p", "", `下一步：${gap.nextAction}`)
+        );
+        return item;
+      }));
+
+      const plan = document.querySelector("#plan");
+      plan.replaceChildren(...data.sevenDayPlan.map((day) => {
+        const item = el("article", "item");
+        item.append(
+          el("h3", "", `第 ${day.day} 天 · ${day.goal}`),
+          el("p", "", `任务：${day.task}`),
+          el("p", "", `交付物：${day.deliverable}`),
+          el("p", "", `自测：${day.selfCheck}`)
+        );
+        return item;
+      }));
+      results.hidden = false;
+      results.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    document.querySelector("#start-interview").addEventListener("click", getNextQuestion);
+    document.querySelector("#next-question").addEventListener("click", getNextQuestion);
+    document.querySelector("#submit-answer").addEventListener("click", scoreAnswer);
+
+    async function getNextQuestion() {
+      if (!appState?.plan) return setStatus("请先生成成长方案", true);
+      const startButton = document.querySelector("#start-interview");
+      const nextButton = document.querySelector("#next-question");
+      setLoading(startButton, true, "正在出题…");
+      setLoading(nextButton, true, "正在出题…");
+      setInterviewStatus("正在生成针对当前差距的面试题");
+      try {
+        const currentQuestion = appState.demo
+          ? DEMO.question
+          : await postJson("/api/interview/question", {
+              jobDescription: appState.jobDescription,
+              gaps: appState.plan.gaps,
+              previousQuestions: appState.interview.map((item) => item.question.question)
+            }, "question");
+        appState.currentQuestion = currentQuestion;
+        saveState();
+        renderQuestion(currentQuestion, appState.demo);
+        setInterviewStatus(appState.demo ? "演示样例题；在答题框任意填写后提交可看评分样例" : "请作答；不知道也可以写出你的分析思路");
+      } catch (error) {
+        setInterviewStatus(error.message, true);
+      } finally {
+        setLoading(startButton, false, "开始模拟面试");
+        setLoading(nextButton, false, "下一题");
+      }
+    }
+
+    async function scoreAnswer() {
+      const answer = document.querySelector("#answer").value.trim();
+      if (!appState?.currentQuestion) return setInterviewStatus("请先生成一道面试题", true);
+      if (!answer) return setInterviewStatus("请先填写你的回答", true);
+      const button = document.querySelector("#submit-answer");
+      setLoading(button, true, "正在评分…");
+      setInterviewStatus("正在按四项量表分析回答");
+      try {
+        const feedback = appState.demo
+          ? DEMO.score
+          : await postJson("/api/interview/score", {
+              jobDescription: appState.jobDescription,
+              question: appState.currentQuestion.question,
+              answer
+            }, "score");
+        appState.interview.push({ question: appState.currentQuestion, answer, feedback });
+        saveState();
+        renderFeedback(feedback, appState.demo);
+        document.querySelector("#next-question").hidden = false;
+        setInterviewStatus("评分已完成并保存在本机浏览器");
+      } catch (error) {
+        setInterviewStatus(error.message, true);
+      } finally {
+        setLoading(button, false, "提交回答");
+      }
+    }
+
+    function renderQuestion(data, isDemo) {
+      document.querySelector("#interview-demo-tag").hidden = !isDemo;
+      interviewSection.hidden = false;
+      document.querySelector("#question-meta").textContent = `题型：${typeLabel(data.type)} · 考察点：${data.focus}`;
+      document.querySelector("#question").textContent = data.question;
+      document.querySelector("#answer").value = "";
+      document.querySelector("#feedback").hidden = true;
+      document.querySelector("#next-question").hidden = true;
+      interviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function renderFeedback(data, isDemo) {
+      const labels = {
+        productStructure: "产品结构",
+        aiTechnicalJudgment: "AI 技术判断",
+        metricsAwareness: "指标意识",
+        communication: "表达清晰度"
+      };
+      document.querySelector("#score-grid").replaceChildren(...Object.entries(labels).map(([key, label]) => {
+        const box = el("div", "score-box", label);
+        box.prepend(el("strong", "", `${data.scores[key]}/5`));
+        return box;
+      }));
+      document.querySelector("#overall").textContent = data.overall;
+      fillList("#omissions", data.omissions.length ? data.omissions : ["未发现明显遗漏"]);
+      fillList("#suggestions", data.suggestions);
+      document.querySelector("#sample-answer").textContent = data.sampleAnswer;
+      document.querySelector("#feedback").hidden = false;
+    }
+
+    // 先尝试同源后端（Vercel/自托管）；静态托管下同源不可用时，用访客自己的 Key 直连 DeepSeek。
+    async function postJson(url, body, kind) {
+      let sameOrigin = null;
+      try {
+        sameOrigin = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (sameOrigin.ok) return await sameOrigin.json();
+      } catch {
+        // 落到直连分支
+      }
+      const apiKey = apiKeyInput.value.trim();
+      if (!apiKey) throw new Error(NO_KEY_HINT);
+      return callDeepSeek(kind, body, apiKey);
+    }
+
+    async function callDeepSeek(kind, input, apiKey) {
+      let response;
+      try {
+        response = await fetch(DEEPSEEK_ENDPOINT, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: DEEPSEEK_MODEL,
+            stream: false,
+            max_tokens: 2500,
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: `${INSTRUCTIONS[kind]}\n只返回一个 JSON 对象，不要使用 Markdown。必须符合以下 JSON Schema：\n${JSON.stringify(SCHEMAS[kind])}` },
+              { role: "user", content: JSON.stringify(input) }
+            ]
+          })
+        });
+      } catch {
+        throw new Error("无法连接 DeepSeek，请检查网络后重试");
+      }
+      if (!response.ok) {
+        if (response.status === 401) throw new Error("API Key 无效或已失效，请检查后重试");
+        if (response.status === 403) throw new Error("当前 Key 无权调用该模型");
+        if (response.status === 429) throw new Error("Key 额度不足或请求过快，请检查账户用量");
+        throw new Error("DeepSeek 返回异常，请稍后重试");
+      }
+      const payload = await response.json();
+      const text = payload.choices?.[0]?.message?.content;
+      if (!text) throw new Error("模型没有返回可用结果，请重试");
+      try {
+        return JSON.parse(text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, ""));
+      } catch {
+        throw new Error("模型返回格式异常，请重试");
+      }
+    }
+
+    function setStatus(message, isError = false) {
+      status.textContent = message;
+      status.classList.toggle("error", isError);
+    }
+
+    function setInterviewStatus(message, isError = false) {
+      interviewStatus.textContent = message;
+      interviewStatus.classList.toggle("error", isError);
+    }
+
+    function setLoading(button, loading, text) {
+      button.disabled = loading;
+      button.textContent = text;
+    }
+
+    function el(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function priorityLabel(priority) {
+      return ({ high: "高优先级", medium: "中优先级", low: "低优先级" })[priority] || priority;
+    }
+
+    function typeLabel(type) {
+      return ({ product: "产品设计", technical: "AI 技术", metrics: "指标评估", project: "项目深挖" })[type] || type;
+    }
+
+    function fillList(selector, values) {
+      document.querySelector(selector).replaceChildren(...values.map((value) => el("li", "", value)));
+    }
+
+    function loadState() {
+      try { return JSON.parse(localStorage.getItem(storageKey)); }
+      catch { localStorage.removeItem(storageKey); return null; }
+    }
+
+    function saveState() {
+      localStorage.setItem(storageKey, JSON.stringify(appState));
+    }
+
+    if (appState) {
+      if (appState.resume && appState.jobDescription) {
+        resumeInput.value = appState.resume;
+        jobInput.value = appState.jobDescription;
+      }
+      if (appState.plan) renderPlan(appState.plan, !!appState.demo);
+      if (appState.currentQuestion) {
+        renderQuestion(appState.currentQuestion, !!appState.demo);
+        const latest = appState.interview?.at(-1);
+        if (latest?.question?.question === appState.currentQuestion.question) {
+          document.querySelector("#answer").value = latest.answer;
+          renderFeedback(latest.feedback, !!appState.demo);
+          document.querySelector("#next-question").hidden = false;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
